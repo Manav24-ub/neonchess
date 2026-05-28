@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Chess Protocol</title>
+    
+    <!-- Tailwind CSS for layout -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chess.js for perfect rule calculation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+
+    <style>
+        :root {
+            --neon-green: #39ff14;
+            --neon-cyan: #00ffff;
+            --neon-pink: #ff00ff;
+            --bg-color: #050505;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: #fff;
+            font-family: 'Courier New', Courier, monospace;
+            overflow-x: hidden;
+        }
+
+        ::-webkit-scrollbar { width: 10px; }
+        ::-webkit-scrollbar-track { background: var(--bg-color); }
+        ::-webkit-scrollbar-thumb { background: var(--neon-green); }
+
+        .neon-text-green { color: var(--neon-green); text-shadow: 0 0 10px var(--neon-green); }
+        .neon-text-cyan { color: var(--neon-cyan); text-shadow: 0 0 10px var(--neon-cyan); }
+        .neon-text-pink { color: var(--neon-pink); text-shadow: 0 0 10px var(--neon-pink); }
+
+        .neon-btn {
+            background: transparent;
+            color: var(--neon-green);
+            border: 1px solid var(--neon-green);
+            transition: all 0.2s;
+        }
+        .neon-btn:hover {
+            background: var(--neon-green);
+            color: #000;
+            box-shadow: 0 0 15px var(--neon-green);
+        }
+
+        .ad-slot {
+            background: repeating-linear-gradient(45deg, #0a0a0a, #0a0a0a 10px, #111 10px, #111 20px);
+            border: 1px dashed #555;
+            color: #555;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        /* Chess Board Styles */
+        #board-container {
+            width: 100%;
+            max-width: 600px;
+            aspect-ratio: 1 / 1;
+            border: 3px solid var(--neon-green);
+            box-shadow: 0 0 20px rgba(57, 255, 20, 0.4), inset 0 0 20px rgba(57, 255, 20, 0.2);
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .square {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            cursor: pointer;
+            position: relative;
+            user-select: none;
+        }
+        .footer {
+            position: bottom;
+            bottom: 15px;
+            width: 100%;
+            text-align: center;
+            font-size: 1.5rem;
+            color: #fff;
+            /* Neon Pink Glow matching the level stats */
+            text-shadow: 0 0 5px #f0f, 0 0 15px #f0f;
+            letter-spacing: 2px;
+        }
+
+        @media (max-width: 600px) {
+            .square { font-size: 1.8rem; }
+        }
+
+        .sq-dark { background-color: #111; }
+        .sq-light { background-color: #222; }
+
+        .square:hover::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Highlight selected piece */
+        .sq-selected {
+            background-color: rgba(57, 255, 20, 0.3) !important;
+            box-shadow: inset 0 0 15px var(--neon-green);
+        }
+
+        /* Highlight valid moves */
+        .sq-valid-move::before {
+            content: '';
+            position: absolute;
+            width: 25%;
+            height: 25%;
+            background-color: rgba(57, 255, 20, 0.6);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--neon-green);
+            z-index: 10;
+        }
+
+        /* Adjust dot if there is an enemy piece (capturing) */
+        .sq-valid-capture::before {
+            content: '';
+            position: absolute;
+            inset: 2px;
+            border: 3px solid var(--neon-green);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--neon-green), inset 0 0 10px var(--neon-green);
+            background: transparent;
+            z-index: 10;
+        }
+
+        .piece {
+            z-index: 20;
+            transition: transform 0.1s;
+        }
+        .piece:active { transform: scale(1.1); }
+
+    </style>
+</head>
+<body class="min-h-screen p-4 flex flex-col items-center">
+
+    <header class="text-center w-full max-w-4xl mb-6">
+        <h1 class="text-4xl md:text-6xl font-bold uppercase tracking-widest neon-text-green mb-2">Neon Chess</h1>
+        <p class="text-sm md:text-base text-gray-400">Tactical Grid Protocol</p>
+    </header>
+
+    <!-- AD SLOT 1 -->
+    <div class="ad-slot w-full max-w-4xl h-24 mb-6 rounded border-neon-green" style="border-color: #39ff1488;">
+        [ ADVERTISEMENT SLOT 1 - 728x90 ]
+    </div>
+
+    <main class="w-full max-w-4xl flex flex-col lg:flex-row gap-8 items-center lg:items-start justify-center">
+        
+        <!-- Left Side: Status & Controls -->
+        <div class="flex flex-col w-full max-w-xs gap-6 order-2 lg:order-1">
+            
+            <div class="border border-gray-800 bg-[#0a0a0a] p-4 rounded text-center">
+                <h3 class="text-gray-400 mb-2 text-sm uppercase tracking-widest">System Status</h3>
+                <div id="status-display" class="text-xl font-bold neon-text-cyan h-12 flex items-center justify-center">
+                    Cyan's Turn
+                </div>
+            </div>
+
+            <!-- AD SLOT 2 -->
+            <div class="ad-slot w-full h-64 rounded">
+                [ ADVERTISEMENT SLOT 2 <br> 300x250 ]
+            </div>
+
+            <div class="flex gap-2">
+                <button onclick="undoMove()" class="neon-btn px-4 py-3 flex-grow rounded uppercase font-bold text-sm">Undo Move</button>
+                <button onclick="resetGame()" class="neon-btn px-4 py-3 flex-grow rounded uppercase font-bold text-sm" style="border-color: #ff003c; color: #ff003c;">Reboot</button>
+            </div>
+            
+        </div>
+
+        <!-- Right Side: The Board -->
+        <div class="w-full max-w-[600px] flex flex-col order-1 lg:order-2 shadow-2xl">
+            <div id="board-container">
+                <!-- Board generated by JavaScript -->
+            </div>
+        </div>
+
+    </main>
+
+    <!-- AD SLOT 3 -->
+    <div class="ad-slot w-full max-w-4xl h-24 mt-12 mb-8 rounded">
+        [ ADVERTISEMENT SLOT 3 - Responsive Banner ]
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="w-full text-center mt-auto py-8 border-t border-gray-800 bg-black">
+        <p class="text-xl tracking-wider neon-text-green font-bold uppercase">Written by Manav</p>
+    </footer>
+
+    <!-- CHESS LOGIC & UI SCRIPT -->
+    <script>
+        // Initialize the chess logic engine
+        const game = new Chess();
+        const boardEl = document.getElementById('board-container');
+        const statusEl = document.getElementById('status-display');
+
+        // State variables for UI
+        let selectedSquare = null;
+        let validMoves = [];
+
+        // Map standard chess piece notation to unicode symbols
+        const pieceSymbols = {
+            p: '♟', n: '♞', b: '♝', r: '♜', q: '♛', k: '♚'
+        };
+
+        function drawBoard() {
+            boardEl.innerHTML = '';
+            const board = game.board(); // Returns 8x8 array
+
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    // Convert grid coordinates to chess coordinates (e.g., a8, h1)
+                    const sq = String.fromCharCode(97 + col) + (8 - row);
+                    const piece = board[row][col];
+                    
+                    const cell = document.createElement('div');
+                    // Alternate colors
+                    const isLight = (row + col) % 2 === 0;
+                    cell.className = `square ${isLight ? 'sq-light' : 'sq-dark'}`;
+                    cell.dataset.sq = sq;
+
+                    // Apply selection highlight
+                    if (sq === selectedSquare) {
+                        cell.classList.add('sq-selected');
+                    }
+
+                    // Apply valid move highlight
+                    const move = validMoves.find(m => m.to === sq);
+                    if (move) {
+                        // Check if it's a capture move
+                        if (game.get(sq)) {
+                            cell.classList.add('sq-valid-capture');
+                        } else {
+                            cell.classList.add('sq-valid-move');
+                        }
+                    }
+
+                    // Render piece if it exists on this square
+                    if (piece) {
+                        const pEl = document.createElement('span');
+                        pEl.className = 'piece';
+                        pEl.innerText = pieceSymbols[piece.type];
+                        
+                        // Style White as Cyan, Black as Pink
+                        if (piece.color === 'w') {
+                            pEl.classList.add('neon-text-cyan');
+                        } else {
+                            pEl.classList.add('neon-text-pink');
+                        }
+                        cell.appendChild(pEl);
+                    }
+
+                    // Click handler
+                    cell.onclick = () => handleSquareClick(sq);
+                    
+                    boardEl.appendChild(cell);
+                }
+            }
+        }
+
+        function handleSquareClick(sq) {
+            // If game over, ignore clicks
+            if (game.game_over()) return;
+
+            // If we have a square selected, try to move there
+            if (selectedSquare) {
+                // Check if the clicked square is in the valid moves list
+                let isMoveValid = validMoves.find(m => m.to === sq);
+
+                if (isMoveValid) {
+                    // Execute move
+                    game.move({
+                        from: selectedSquare,
+                        to: sq,
+                        promotion: 'q' // Auto-promote to Queen to simplify UI
+                    });
+                    
+                    // Reset selection
+                    selectedSquare = null;
+                    validMoves = [];
+                    
+                    updateStatus();
+                    drawBoard();
+                    return;
+                }
+            }
+
+            // If we didn't move, check if we are selecting a piece
+            const piece = game.get(sq);
+            if (piece && piece.color === game.turn()) {
+                selectedSquare = sq;
+                // Get valid moves for this piece
+                validMoves = game.moves({ square: sq, verbose: true });
+            } else {
+                // Clicked on empty space or enemy piece without moving
+                selectedSquare = null;
+                validMoves = [];
+            }
+
+            drawBoard();
+        }
+
+        function updateStatus() {
+            let status = '';
+            let moveColor = game.turn() === 'w' ? 'Cyan' : 'Pink';
+            let colorClass = game.turn() === 'w' ? 'neon-text-cyan' : 'neon-text-pink';
+
+            if (game.in_checkmate()) {
+                status = `CHECKMATE!<br>${moveColor} lost.`;
+                colorClass = 'neon-text-green'; 
+            } 
+            else if (game.in_draw() || game.in_stalemate() || game.in_threefold_repetition()) {
+                status = 'DRAW (System Tie)';
+                colorClass = 'neon-text-green';
+            } 
+            else {
+                status = `${moveColor}'s Turn`;
+                if (game.in_check()) {
+                    status += '<br><span style="color:#ff003c; text-shadow:0 0 10px #ff003c;">!! IN CHECK !!</span>';
+                }
+            }
+
+            statusEl.innerHTML = status;
+            statusEl.className = `text-xl font-bold h-12 flex flex-col items-center justify-center text-center leading-tight ${colorClass}`;
+        }
+
+        function undoMove() {
+            game.undo();
+            selectedSquare = null;
+            validMoves = [];
+            updateStatus();
+            drawBoard();
+        }
+
+        function resetGame() {
+            if(confirm('Reboot the system? This will clear the current board.')) {
+                game.reset();
+                selectedSquare = null;
+                validMoves = [];
+                updateStatus();
+                drawBoard();
+            }
+        }
+
+        // Initialize board on load
+        window.onload = () => {
+            updateStatus();
+            drawBoard();
+        };
+
+    </script>
+</body>
+</html>
